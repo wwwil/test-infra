@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	match = regexp.MustCompile(`(?mi)^/meow(vie)?(?: (.+))?\s*$`)
+	match = regexp.MustCompile(`(?mi)^/meow(meow)?(vie)?(?: (.+))?\s*$`)
 	meow  = &realClowder{
 		url: "https://api.thecatapi.com/api/images/get?format=json&results_per_page=1",
 	}
@@ -194,7 +194,7 @@ func handle(gc githubClient, log *logrus.Entry, e *github.GenericCommentEvent, c
 		return nil
 	}
 
-	category, movieCat, err := parseMatch(mat)
+	category, movieCat, twice, err := parseMatch(mat)
 	if err != nil {
 		return err
 	}
@@ -212,6 +212,14 @@ func handle(gc githubClient, log *logrus.Entry, e *github.GenericCommentEvent, c
 			log.WithError(err).Error("Failed to get cat img")
 			continue
 		}
+		if twice == true {
+			resp2, err2 := c.readCat(category, movieCat)
+			if err2 != nil {
+				log.WithError(err).Error("Failed to get second cat img")
+				continue
+			}
+			resp = resp + resp2
+		}
 		return gc.CreateComment(org, repo, number, plugins.FormatResponseRaw(e.Body, e.HTMLURL, e.User.Login, resp))
 	}
 
@@ -228,12 +236,13 @@ func handle(gc githubClient, log *logrus.Entry, e *github.GenericCommentEvent, c
 	return errors.New("could not find a valid cat image")
 }
 
-func parseMatch(mat []string) (string, bool, error) {
-	if len(mat) != 3 {
-		err := fmt.Errorf("expected 3 capture groups in regexp match, but got %d", len(mat))
-		return "", false, err
+func parseMatch(mat []string) (string, bool, bool, error) {
+	if len(mat) != 4 {
+		err := fmt.Errorf("expected 4 capture groups in regexp match, but got %d", len(mat))
+		return "", false, false, err
 	}
-	category := strings.TrimSpace(mat[2])
-	movieCat := len(mat[1]) > 0 // "vie" suffix is present.
-	return category, movieCat, nil
+	category := strings.TrimSpace(mat[3])
+	movieCat := len(mat[2]) > 0 // "vie" suffix is present.
+	twice := len(mat[1]) > 0 // second meow is present
+	return category, movieCat, twice, nil
 }
